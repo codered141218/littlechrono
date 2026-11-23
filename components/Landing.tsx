@@ -2,7 +2,8 @@
 import { motion, MotionConfig } from "motion/react";
 import Link from "next/link";
 import { ACCENTS } from "@/lib/kinds";
-import type { MomentKind } from "@/lib/types";
+import type { Me, MomentKind } from "@/lib/types";
+import { AccountMenu, SignInButton } from "./Account";
 import { Doodle, Logo, PlusIcon } from "./Icons";
 
 const DEMO: { age: string; title: string; kind: MomentKind; seed?: number; by?: string }[] = [
@@ -41,7 +42,8 @@ function DemoCard({ d, i }: { d: (typeof DEMO)[number]; i: number }) {
   );
 }
 
-export function Landing() {
+export function Landing({ me }: { me: Me | null }) {
+  const signIn = Boolean(me?.authEnabled && !me.user);
   const loop = [...DEMO, ...DEMO];
   return (
     <MotionConfig reducedMotion="user">
@@ -50,9 +52,16 @@ export function Landing() {
           <Logo />
           <span>LittleChrono</span>
         </Link>
-        <Link href="/start" className="btn btn-sm btn-primary">
-          Start a timeline
-        </Link>
+        <div className="topbar-actions">
+          {signIn ? (
+            <SignInButton className="btn btn-sm" label="Sign in" callbackUrl="/" />
+          ) : (
+            <Link href="/start" className="btn btn-sm btn-primary">
+              Start a timeline
+            </Link>
+          )}
+          <AccountMenu me={me?.user ? me : null} />
+        </div>
       </header>
 
       <main>
@@ -75,9 +84,13 @@ export function Landing() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.35 }}
           >
-            <Link href="/start" className="btn btn-primary">
-              <PlusIcon size={20} /> Start your baby&apos;s timeline
-            </Link>
+            {signIn ? (
+              <SignInButton className="btn btn-primary" label="Start with Google" callbackUrl="/start" />
+            ) : (
+              <Link href="/start" className="btn btn-primary">
+                <PlusIcon size={20} /> Start your baby&apos;s timeline
+              </Link>
+            )}
             <a href="#how" className="btn">
               How it works
             </a>
@@ -97,7 +110,7 @@ export function Landing() {
           {[
             {
               t: "Start a timeline",
-              p: "Add your baby's name and birthday. You get a private parent link, no account or password needed.",
+              p: "Sign in with Google and add your baby's name, birthday and birth details. Keep one timeline for each little one.",
             },
             {
               t: "Add moments as they happen",

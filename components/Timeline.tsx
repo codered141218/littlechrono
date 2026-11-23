@@ -3,6 +3,7 @@ import { AnimatePresence, motion, useMotionValueEvent, useScroll, useSpring } fr
 import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { ageLabel, chapterOf, formatDate, type Chapter } from "@/lib/age";
 import { mediaUrl } from "@/lib/client";
+import { nameOf } from "@/lib/names";
 import type { Moment, PublicBook } from "@/lib/types";
 import { Doodle, StarBurst } from "./Icons";
 
@@ -127,7 +128,7 @@ export function Timeline({
               </motion.span>
             </AnimatePresence>
             <span className="roll">
-              <small>{hud.key === "bump" ? `${book.name},` : hud.key === "m0" ? `${book.name} as` : `${book.name} at`}</small>
+              <small>{hud.key === "bump" ? `${nameOf(book)},` : hud.key === "m0" ? `${nameOf(book)} as` : `${nameOf(book)} at`}</small>
               <b>{hud.key === "bump" ? "on the way" : hud.key === "m0" ? "a newborn" : hud.small}</b>
             </span>
           </motion.div>

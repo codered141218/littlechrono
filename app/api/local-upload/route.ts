@@ -1,5 +1,5 @@
 import { fail, json } from "@/lib/api";
-import { keyMatches } from "@/lib/auth";
+import { canEdit } from "@/lib/auth";
 import { getBook } from "@/lib/books";
 import { newKey } from "@/lib/ids";
 import { storageInfo, writeLocalFile } from "@/lib/storage";
@@ -11,7 +11,7 @@ export async function POST(req: Request) {
   const file = form.get("file");
   const book = await getBook(String(form.get("bookId") ?? ""));
   if (!book) return fail("This timeline doesn't exist.", 404);
-  if (!keyMatches(book, String(form.get("key") ?? "")) && !book.allowFriends)
+  if (!book.allowFriends && !(await canEdit(book, String(form.get("key") ?? ""))))
     return fail("Photo sharing is paused for this timeline.", 403);
   if (!(file instanceof File) || !/^image\/(jpeg|png|webp|gif)$/.test(file.type))
     return fail("Only JPEG, PNG, WebP or GIF photos can be added.");

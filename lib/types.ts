@@ -15,9 +15,29 @@ export interface Photo {
   h: number;
 }
 
+export type Sex = "girl" | "boy";
+
+export interface BirthDetails {
+  /** HH:MM, 24h */
+  time?: string;
+  weightGrams?: number;
+  weightUnit?: "kg" | "lb";
+  lengthCm?: number;
+  lengthUnit?: "cm" | "in";
+  doctor?: string;
+  place?: string;
+}
+
 export interface Book {
   id: string;
+  /** Full name */
   name: string;
+  /** What the family calls the baby; used in headlines */
+  nickname?: string;
+  sex?: Sex | null;
+  birth?: BirthDetails;
+  /** Google account ids (token.sub) of parents who can manage this timeline */
+  ownerIds?: string[];
   /** YYYY-MM-DD */
   birthDate: string;
   accent: Accent;
@@ -28,7 +48,7 @@ export interface Book {
   keyHash: string;
 }
 
-export type PublicBook = Omit<Book, "keyHash">;
+export type PublicBook = Omit<Book, "keyHash" | "ownerIds">;
 
 export interface Moment {
   id: string;
@@ -53,3 +73,18 @@ export interface BookPayload {
 export type StorageInfo =
   | { mode: "blob"; access: "public" | "private" }
   | { mode: "local" };
+
+export interface UserIndex {
+  id: string;
+  email?: string;
+  name?: string;
+  image?: string;
+  books: string[];
+  updatedAt: string;
+}
+
+export interface Me {
+  authEnabled: boolean;
+  user: { id: string; name?: string; email?: string; image?: string } | null;
+  books: (PublicBook & { momentCount: number })[];
+}

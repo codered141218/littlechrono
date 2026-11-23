@@ -1,6 +1,9 @@
 "use client";
 import { useEffect, useState } from "react";
+import { todayISO } from "@/lib/age";
 import { api, copyText, forgetBook, mediaUrl, parentUrl, saveBookLocally, shareUrl } from "@/lib/client";
+import { nameOf } from "@/lib/names";
+import { BirthFields, birthFormFrom, birthPayload, type BirthForm } from "./BirthFields";
 import { ACCENTS } from "@/lib/kinds";
 import type { Accent, PublicBook, StorageInfo } from "@/lib/types";
 import { PhotoPicker, usePhotoUploads } from "./PhotoPicker";
@@ -32,7 +35,7 @@ export function ShareSheet({ book, isParent, onClose }: { book: PublicBook; isPa
   }, [book.id]);
   return (
     <Sheet
-      title={`Share ${book.name}'s timeline`}
+      title={`Share ${nameOf(book)}'s timeline`}
       subtitle={
         book.allowFriends
           ? "Anyone with this link can watch the timeline and add their own photos."
@@ -48,8 +51,8 @@ export function ShareSheet({ book, isParent, onClose }: { book: PublicBook; isPa
           onClick={() =>
             navigator
               .share({
-                title: `${book.name}'s timeline`,
-                text: book.allowFriends ? `Have a photo of ${book.name}? Add it to the timeline!` : `See ${book.name} grow up, one moment at a time.`,
+                title: `${nameOf(book)}'s timeline`,
+                text: book.allowFriends ? `Have a photo of ${nameOf(book)}? Add it to the timeline!` : `See ${nameOf(book)} grow up, one moment at a time.`,
                 url,
               })
               .catch(() => {})
@@ -60,7 +63,7 @@ export function ShareSheet({ book, isParent, onClose }: { book: PublicBook; isPa
       )}
       {isParent && (
         <p className="hint" style={{ marginTop: 14 }}>
-          This link can&apos;t edit or delete anything. Your parent link is in Settings.
+          This link can&apos;t edit or delete anything, and nobody needs to sign in to open it.
         </p>
       )}
     </Sheet>
@@ -74,22 +77,28 @@ export function SettingsSheet({
   onClose,
   onSaved,
   onAccentPreview,
+  signedIn,
+  onKeyChange,
 }: {
   book: PublicBook;
   storage: StorageInfo;
-  parentKey: string;
+  parentKey?: string;
   onClose: () => void;
   onSaved: (b: PublicBook) => void;
   onAccentPreview: (a: Accent | null) => void;
+  signedIn: boolean;
+  onKeyChange: (key: string) => void;
 }) {
   const toast = useToast();
   const [name, setName] = useState(book.name);
   const [birthDate, setBirthDate] = useState(book.birthDate);
+  const [details, setDetails] = useState<BirthForm>(() => birthFormFrom(book));
   const [accent, setAccent] = useState<Accent>(book.accent);
   const [allowFriends, setAllowFriends] = useState(book.allowFriends);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [links, setLinks] = useState({ share: "", parent: "" });
+  const [confirmName, setConfirmName] = useState("");
   const cover = usePhotoUploads({
     storage,
     bookId: book.id,
@@ -98,7 +107,10 @@ export function SettingsSheet({
     max: 1,
   });
 
-  useEffect(() => setLinks({ share: shareUrl(book.id), parent: parentUrl(book.id, parentKey) }), [book.id, parentKey]);
+  useEffect(
+    () => setLinks({ share: shareUrl(book.id), parent: parentKey ? parentUrl(book.id, parentKey) : "" }),
+    [book.id, parentKey],
+  );
 
   const close = () => {
     onAccentPreview(null);
@@ -114,9 +126,9 @@ export function SettingsSheet({
       const { book: saved } = await api<{ book: PublicBook }>(`/api/books/${book.id}`, {
         method: "PATCH",
         key: parentKey,
-        body: { name, birthDate, accent, allowFriends, coverPhoto: cover.photos[0] ?? null },
+        body: { name, birthDate, accent, allowFriends, coverPhoto: cover.photos[0] ?? null, ...birthPayload(details) },
       });
-      saveBookLocally({ id: saved.id, name: saved.name, accent: saved.accent, key: parentKey });
+      saveBookLocally({ id: saved.id, name: nameOf(saved), accent: saved.accent, key: parentKey });
       onSaved(saved);
       onAccentPreview(null);
       toast("Settings saved");
@@ -127,19 +139,45 @@ export function SettingsSheet({
     }
   }
 
+  async function newParentLink() {
+    if (parentKey && !confirm("Make a new parent link? The old parent link will stop working.")) return;
+    try {
+      const { key } = await api<{ key: string }>(`/api/books/${book.id}/invite`, { method: "POST", key: parentKey });
+      saveBookLocally({ id: book.id, name: nameOf(book), accent: book.accent, key });
+      onKeyChange(key);
+      toast("New parent link ready");
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  }
+
+  async function deleteTimeline() {
+    try {
+      await api(`/api/books/${book.id}`, { method: "DELETE", key: parentKey });
+      forgetBook(book.id);
+      location.href = "/";
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  }
+
+  const unborn = birthDate > todayISO();
+
   return (
     <Sheet title="Settings" onClose={close}>
       <form onSubmit={save}>
         <div className="row">
           <label className="field">
-            <span>Baby&apos;s name</span>
-            <input className="input" value={name} maxLength={40} onChange={(e) => setName(e.target.value)} />
+            <span>Full name</span>
+            <input className="input" value={name} maxLength={60} onChange={(e) => setName(e.target.value)} />
           </label>
           <label className="field">
-            <span>Birth date (or due date)</span>
+            <span>{unborn ? "Due date" : "Birth date"}</span>
             <input className="input" type="date" value={birthDate} onChange={(e) => setBirthDate(e.target.value)} />
           </label>
         </div>
+
+        <BirthFields value={details} onChange={setDetails} unborn={unborn} />
 
         <div className="field">
           <span className="label">Timeline color</span>
@@ -187,27 +225,55 @@ export function SettingsSheet({
         </div>
       </form>
 
-      <h3 className="section-title">Links</h3>
-      <div className="label">Share link, for friends and family</div>
+      <h3 className="section-title">Share link</h3>
+      <p className="hint" style={{ marginBottom: 6 }}>For friends and family. Anyone with it can watch the timeline{book.allowFriends ? " and add photos" : ""}, no sign-in needed.</p>
       {links.share && <LinkBox url={links.share} label="Share link" />}
-      <div className="label" style={{ marginTop: 14 }}>Parent link, keep it private</div>
-      <p className="hint" style={{ marginBottom: 6 }}>
-        Open this on your partner&apos;s phone or a new device to edit the timeline there. Anyone with it can edit and delete.
-      </p>
-      {links.parent && <LinkBox url={links.parent} label="Parent link" />}
 
-      <button
-        type="button"
-        className="btn btn-sm btn-ghost"
-        style={{ marginTop: 18 }}
-        onClick={() => {
-          if (!confirm("Remove parent access on this device? You'll need the parent link to edit again.")) return;
-          forgetBook(book.id);
-          location.href = `/b/${book.id}`;
-        }}
-      >
-        Remove parent access on this device
-      </button>
+      <h3 className="section-title">Co-parent link</h3>
+      <p className="hint" style={{ marginBottom: 6 }}>
+        Send this only to your partner. Opening it lets them edit, and if they sign in with Google the timeline is added to
+        their account. Anyone with it can edit and delete.
+      </p>
+      {links.parent ? (
+        <>
+          <LinkBox url={links.parent} label="Co-parent link" />
+          <button type="button" className="btn btn-sm btn-ghost" onClick={newParentLink}>
+            Make a new link (the old one stops working)
+          </button>
+        </>
+      ) : (
+        <button type="button" className="btn btn-sm" onClick={newParentLink}>
+          Create a co-parent link
+        </button>
+      )}
+
+      <div className="danger-zone">
+        <div className="label">Delete this timeline</div>
+        <p className="hint" style={{ margin: "4px 0 10px" }}>
+          Removes every moment and photo for good. Type <b>{nameOf(book)}</b> to confirm.
+        </p>
+        <div className="row" style={{ alignItems: "center" }}>
+          <input className="input" value={confirmName} placeholder={nameOf(book)} onChange={(e) => setConfirmName(e.target.value)} />
+          <button type="button" className="btn btn-sm btn-danger" style={{ flex: "none" }} disabled={confirmName.trim() !== nameOf(book)} onClick={deleteTimeline}>
+            Delete timeline
+          </button>
+        </div>
+      </div>
+
+      {!signedIn && parentKey && (
+        <button
+          type="button"
+          className="btn btn-sm btn-ghost"
+          style={{ marginTop: 14 }}
+          onClick={() => {
+            if (!confirm("Remove parent access on this device? You'll need the parent link to edit again.")) return;
+            forgetBook(book.id);
+            location.href = `/b/${book.id}`;
+          }}
+        >
+          Remove parent access on this device
+        </button>
+      )}
     </Sheet>
   );
 }

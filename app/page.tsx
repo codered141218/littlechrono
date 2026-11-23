@@ -1,96 +1,104 @@
 "use client";
-import { AnimatePresence, motion } from "motion/react";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { BookView } from "@/components/BookView";
+import { Dashboard } from "@/components/Dashboard";
 import { Landing } from "@/components/Landing";
-import { api, forgetBook, savedBooks, type SavedBook } from "@/lib/client";
+import { api, claimSavedBooks, fetchMe, forgetBook, savedBooks, type SavedBook } from "@/lib/client";
 import { accentOf } from "@/lib/kinds";
-import type { BookPayload, StorageInfo } from "@/lib/types";
+import type { BookPayload, Me, StorageInfo } from "@/lib/types";
 
-type Loaded = BookPayload & { storage: StorageInfo | null };
+type Loaded = BookPayload & { storage: StorageInfo | null; canEdit?: boolean };
+type State =
+  | { kind: "loading" }
+  | { kind: "landing"; me: Me | null }
+  | { kind: "dashboard"; me: Me }
+  | { kind: "book"; saved: SavedBook[]; data: Loaded };
 
-/** Home: shows the timeline you use on this device, or the landing page for newcomers. */
+/**
+ * Home:
+ *  - signed in: your timelines
+ *  - signed out with Google sign-in available: the landing page
+ *  - sign-in not set up: the timeline last used on this device
+ */
 export default function Home() {
-  const [state, setState] = useState<"loading" | "landing" | { saved: SavedBook[]; data: Loaded }>("loading");
+  const [state, setState] = useState<State>({ kind: "loading" });
 
-  async function open(id?: string) {
+  async function openSaved(id?: string) {
     const saved = savedBooks();
     const pick = saved.find((b) => b.id === id) ?? saved.find((b) => b.key) ?? saved[0];
-    if (!pick) return setState("landing");
+    if (!pick) return setState({ kind: "landing", me: null });
     try {
-      const data = await api<Loaded>(`/api/books/${pick.id}`);
-      setState({ saved, data });
+      const data = await api<Loaded>(`/api/books/${pick.id}`, { key: pick.key });
+      setState({ kind: "book", saved, data });
     } catch (err) {
       if (/doesn't exist/.test((err as Error).message)) {
         forgetBook(pick.id);
-        return open();
+        return openSaved();
       }
-      setState("landing");
+      setState({ kind: "landing", me: null });
     }
   }
 
   useEffect(() => {
-    open();
+    (async () => {
+      let me = await fetchMe(true);
+      if (me.user) {
+        // Timelines made on this device before signing in join the account automatically.
+        if (await claimSavedBooks(me.books.map((b) => b.id))) me = await fetchMe(true);
+        return setState({ kind: "dashboard", me });
+      }
+      if (me.authEnabled) return setState({ kind: "landing", me });
+      openSaved();
+    })();
   }, []);
 
-  if (state === "loading") return <div className="center-page" aria-busy="true" />;
-  if (state === "landing" || !state.data.storage) return <Landing />;
-
-  const { data, saved } = state;
+  if (state.kind === "loading") return <div className="center-page" aria-busy="true" />;
+  if (state.kind === "landing") return <Landing me={state.me} />;
+  if (state.kind === "dashboard") return <Dashboard me={state.me} />;
+  if (!state.data.storage) return <Landing me={null} />;
   return (
     <BookView
-      key={data.book.id}
-      initial={data}
-      storage={data.storage!}
-      topbarExtra={<Switcher saved={saved} current={data.book.id} onPick={(id) => open(id)} />}
+      key={state.data.book.id}
+      initial={state.data}
+      storage={state.data.storage}
+      initialCanEdit={state.data.canEdit}
+      topbarExtra={<Switcher saved={state.saved} current={state.data.book.id} onPick={(id) => openSaved(id)} />}
     />
   );
 }
 
 function Switcher({ saved, current, onPick }: { saved: SavedBook[]; current: string; onPick: (id: string) => void }) {
-  const [openMenu, setOpenMenu] = useState(false);
+  const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    const onDoc = (e: MouseEvent) => !ref.current?.contains(e.target as Node) && setOpenMenu(false);
+    const onDoc = (e: MouseEvent) => !ref.current?.contains(e.target as Node) && setOpen(false);
     document.addEventListener("mousedown", onDoc);
     return () => document.removeEventListener("mousedown", onDoc);
   }, []);
   return (
     <div ref={ref} style={{ position: "relative" }}>
-      <button className="btn btn-sm btn-ghost" aria-expanded={openMenu} onClick={() => setOpenMenu((o) => !o)}>
+      <button className="btn btn-sm btn-ghost" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
         {saved.length > 1 ? "Switch baby" : "New timeline"}
       </button>
-      <AnimatePresence>
-        {openMenu && (
-          <motion.div
-            initial={{ opacity: 0, y: -8, scale: 0.96 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -8, scale: 0.96 }}
-            className="panel"
-            style={{ position: "absolute", right: 0, top: 48, padding: 10, minWidth: 220, display: "grid", gap: 4, zIndex: 50 }}
-          >
-            {saved.map((b) => (
-              <button
-                key={b.id}
-                className="btn btn-sm btn-ghost"
-                style={{ justifyContent: "flex-start", fontWeight: b.id === current ? 800 : 600 }}
-                onClick={() => {
-                  setOpenMenu(false);
-                  onPick(b.id);
-                }}
-              >
-                <span style={{ width: 14, height: 14, borderRadius: 9, border: "2px solid var(--line)", background: accentOf(b.accent).hex }} />
-                {b.name}
-                {!b.key && <span className="hint">(shared)</span>}
-              </button>
-            ))}
-            <Link href="/start" className="btn btn-sm btn-primary" style={{ marginTop: 6 }}>
-              Start a new timeline
-            </Link>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {open && (
+        <div className="menu">
+          {saved.map((b) => (
+            <button
+              key={b.id}
+              style={{ display: "flex", alignItems: "center", gap: 8, fontWeight: b.id === current ? 800 : 600 }}
+              onClick={() => {
+                setOpen(false);
+                onPick(b.id);
+              }}
+            >
+              <span style={{ width: 14, height: 14, borderRadius: 9, border: "2px solid var(--line)", background: accentOf(b.accent).hex }} />
+              {b.name}
+            </button>
+          ))}
+          <Link href="/start">Start a new timeline</Link>
+        </div>
+      )}
     </div>
   );
 }

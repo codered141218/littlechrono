@@ -2,6 +2,7 @@
 import { motion } from "motion/react";
 import { useState } from "react";
 import { agePhrase, todayISO } from "@/lib/age";
+import { nameOf } from "@/lib/names";
 import { api, friendName, rememberFriendName } from "@/lib/client";
 import type { Moment, PublicBook, StorageInfo } from "@/lib/types";
 import { Doodle } from "./Icons";
@@ -67,7 +68,7 @@ export function FriendSheet({
           <Doodle kind="friend" />
         </motion.div>
         <p style={{ textAlign: "center", fontSize: 18 }}>
-          Your photos are now on {book.name}&apos;s timeline, right where they belong in time.
+          Your photos are now on {nameOf(book)}&apos;s timeline, right where they belong in time.
         </p>
         <div className="sheet-foot" style={{ justifyContent: "center", marginTop: 22 }}>
           <button className="btn btn-primary" onClick={onClose}>
@@ -79,7 +80,7 @@ export function FriendSheet({
   }
 
   return (
-    <Sheet title={`Add a photo of ${book.name}`} subtitle="Your photo goes on the timeline with your name on it." onClose={onClose}>
+    <Sheet title={`Add a photo of ${nameOf(book)}`} subtitle="Your photo goes on the timeline with your name on it." onClose={onClose}>
       <form onSubmit={send}>
         <PhotoPicker state={photos} label="Choose photos" hint="Up to 6 photos. We'll read the date from each photo when we can." />
         <label className="field">
@@ -102,12 +103,12 @@ export function FriendSheet({
               setDateTouched(true);
             }}
           />
-          {date && <span className="age-preview">{agePhrase(book.name, book.birthDate, date)}</span>}
+          {date && <span className="age-preview">{agePhrase(nameOf(book), book.birthDate, date)}</span>}
         </label>
         {error && <div className="error">{error}</div>}
         <div className="sheet-foot" style={{ justifyContent: "flex-end" }}>
           <button className="btn btn-primary" disabled={saving || photos.busy}>
-            {photos.busy ? "Uploading photos…" : saving ? "Sending…" : `Add to ${book.name}'s timeline`}
+            {photos.busy ? "Uploading photos…" : saving ? "Sending…" : `Add to ${nameOf(book)}'s timeline`}
           </button>
         </div>
       </form>

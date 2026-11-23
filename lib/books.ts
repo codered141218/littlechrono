@@ -1,6 +1,6 @@
 import "server-only";
 import { deletePaths, listPaths, readJSON, writeJSON } from "./storage";
-import type { Book, Moment, Photo, PublicBook } from "./types";
+import type { BirthDetails, Book, Moment, Photo, PublicBook } from "./types";
 import { isBookId, isMomentId } from "./ids";
 
 const bookPath = (id: string) => `books/${id}/book.json`;
@@ -16,8 +16,17 @@ export const saveBook = (book: Book) => writeJSON(bookPath(book.id), book);
 
 export function toPublic(book: Book): PublicBook {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { keyHash, ...rest } = book;
+  const { keyHash, ownerIds, ...rest } = book;
   return rest;
+}
+
+/** Removes a whole timeline: moments, photos and the book itself. */
+export async function deleteBook(id: string) {
+  const paths = await listPaths(`books/${id}/`);
+  const nested = await Promise.all(
+    ["moments", "photos"].map((d) => listPaths(`books/${id}/${d}/`)),
+  );
+  await deletePaths([...new Set([...paths, ...nested.flat()])].filter((p) => !p.endsWith("/moments") && !p.endsWith("/photos")));
 }
 
 async function mapLimit<T, R>(items: T[], limit: number, fn: (t: T) => Promise<R>) {
@@ -59,6 +68,30 @@ export const deletePhotos = (photos: Photo[]) =>
   deletePaths(photos.map((p) => p.path)).catch(() => {});
 
 /* ---------- validation helpers ---------- */
+
+/** Validates the optional profile fields shared by create and update. */
+export function cleanProfile(b: Record<string, unknown>) {
+  const out: { nickname?: string; sex?: "girl" | "boy" | null; birth?: BirthDetails } = {};
+  if ("nickname" in b) out.nickname = cleanText(b.nickname, 30) || undefined;
+  if ("sex" in b) out.sex = b.sex === "girl" || b.sex === "boy" ? b.sex : null;
+  if ("birth" in b && b.birth && typeof b.birth === "object") {
+    const r = b.birth as Record<string, unknown>;
+    const birth: BirthDetails = {};
+    if (typeof r.time === "string" && /^([01]\d|2[0-3]):[0-5]\d$/.test(r.time)) birth.time = r.time;
+    const g = Number(r.weightGrams);
+    if (Number.isFinite(g) && g >= 200 && g <= 9000) birth.weightGrams = Math.round(g);
+    birth.weightUnit = r.weightUnit === "lb" ? "lb" : "kg";
+    const cm = Number(r.lengthCm);
+    if (Number.isFinite(cm) && cm >= 20 && cm <= 80) birth.lengthCm = Math.round(cm * 10) / 10;
+    birth.lengthUnit = r.lengthUnit === "in" ? "in" : "cm";
+    const doctor = cleanText(r.doctor, 60);
+    if (doctor) birth.doctor = doctor;
+    const place = cleanText(r.place, 80);
+    if (place) birth.place = place;
+    out.birth = birth;
+  }
+  return out;
+}
 
 export const isDate = (s: unknown): s is string =>
   typeof s === "string" && /^\d{4}-\d{2}-\d{2}$/.test(s) && !Number.isNaN(Date.parse(s));

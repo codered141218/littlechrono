@@ -73,10 +73,11 @@ export interface LiveAge {
   seconds: number;
 }
 
-/** Age right now, counted from local midnight of the birth date. */
-export function liveAge(birth: string, now: Date): LiveAge {
+/** Age right now, counted from the birth time (or local midnight when unknown). */
+export function liveAge(birth: string, now: Date, time?: string): LiveAge {
   const [y, m, d] = parts(birth);
-  const born = new Date(y, m - 1, d).getTime();
+  const [hh, mm] = time && /^\d{2}:\d{2}$/.test(time) ? time.split(":").map(Number) : [0, 0];
+  const born = new Date(y, m - 1, d, hh, mm).getTime();
   let ms = now.getTime() - born;
   const unborn = ms < 0;
   ms = Math.abs(ms);

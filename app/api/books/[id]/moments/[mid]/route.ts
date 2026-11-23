@@ -1,5 +1,5 @@
 import { body, fail, json, route } from "@/lib/api";
-import { keyFrom, keyMatches } from "@/lib/auth";
+import { canEdit, keyFrom } from "@/lib/auth";
 import { cleanPhotos, cleanText, deleteMoment, deletePhotos, getBook, getMoment, isDate, saveMoment } from "@/lib/books";
 import { isKind } from "@/lib/kinds";
 
@@ -9,7 +9,7 @@ async function load(req: Request, { params }: Ctx) {
   const { id, mid } = await params;
   const book = await getBook(id);
   if (!book) return { error: fail("This timeline doesn't exist.", 404) };
-  if (!keyMatches(book, keyFrom(req))) return { error: fail("Only parents can change moments.", 403) };
+  if (!(await canEdit(book, keyFrom(req)))) return { error: fail("Only parents can change moments.", 403) };
   const moment = await getMoment(id, mid);
   if (!moment) return { error: fail("This moment was already removed.", 404) };
   return { book, moment };

@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { agePhrase, todayISO } from "@/lib/age";
+import { nameOf } from "@/lib/names";
 import { api } from "@/lib/client";
 import { KINDS } from "@/lib/kinds";
 import type { Moment, MomentKind, PublicBook, StorageInfo } from "@/lib/types";
@@ -23,7 +24,7 @@ const SUGGESTIONS: { title: string; kind: MomentKind }[] = [
   { title: "Birthday party", kind: "celebration" },
 ];
 
-export type MomentPreset = { title?: string; date?: string; kind?: MomentKind; star?: boolean };
+export type MomentPreset = { title?: string; date?: string; kind?: MomentKind; star?: boolean; note?: string };
 
 export function MomentSheet({
   book,
@@ -37,7 +38,7 @@ export function MomentSheet({
 }: {
   book: PublicBook;
   storage: StorageInfo;
-  parentKey: string;
+  parentKey?: string;
   moment?: Moment;
   preset?: MomentPreset;
   onClose: () => void;
@@ -52,7 +53,7 @@ export function MomentSheet({
   const [dateTouched, setDateTouched] = useState(editing || Boolean(preset?.date));
   const [dateFromPhoto, setDateFromPhoto] = useState(false);
   const [kind, setKind] = useState<MomentKind>(moment?.kind ?? preset?.kind ?? "first");
-  const [note, setNote] = useState(moment?.note ?? "");
+  const [note, setNote] = useState(moment?.note ?? preset?.note ?? "");
   const [star, setStar] = useState(Boolean(moment?.star ?? preset?.star));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -83,7 +84,7 @@ export function MomentSheet({
         ? await api<{ moment: Moment }>(`/api/books/${book.id}/moments/${moment!.id}`, { method: "PATCH", body: payload, key: parentKey })
         : await api<{ moment: Moment }>(`/api/books/${book.id}/moments`, { method: "POST", body: payload, key: parentKey });
       onSaved(saved);
-      toast(editing ? "Moment saved" : `Added to ${book.name}'s timeline`);
+      toast(editing ? "Moment saved" : `Added to ${nameOf(book)}'s timeline`);
       onClose();
     } catch (err) {
       setError((err as Error).message);
@@ -108,7 +109,7 @@ export function MomentSheet({
   return (
     <Sheet
       title={editing ? "Edit moment" : "Add a moment"}
-      subtitle={editing ? undefined : `Every moment lands in order on ${book.name}'s timeline.`}
+      subtitle={editing ? undefined : `Every moment lands in order on ${nameOf(book)}'s timeline.`}
       onClose={onClose}
     >
       <form onSubmit={save}>
@@ -157,7 +158,7 @@ export function MomentSheet({
           />
           {date && (
             <span className="age-preview">
-              {agePhrase(book.name, book.birthDate, date)}
+              {agePhrase(nameOf(book), book.birthDate, date)}
               {dateFromPhoto && <span className="hint"> (date taken from the photo)</span>}
             </span>
           )}

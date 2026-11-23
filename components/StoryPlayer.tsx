@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ageLabel, formatDate, liveAge } from "@/lib/age";
 import { mediaUrl } from "@/lib/client";
+import { birthSentence, nameOf } from "@/lib/names";
 import type { Moment, Photo, PublicBook } from "@/lib/types";
 import { CloseIcon, Doodle, PauseIcon, PlayIcon } from "./Icons";
 
@@ -107,10 +108,10 @@ export function StoryPlayer({ book, moments, onClose }: { book: PublicBook; mome
     return ids;
   }, [slides]);
   const currentBar = slide.type === "moment" ? bars.indexOf(slide.moment.id) : -1;
-  const now = liveAge(book.birthDate, new Date());
+  const now = liveAge(book.birthDate, new Date(), book.birth?.time);
 
   return (
-    <motion.div className="story" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} role="dialog" aria-modal="true" aria-label={`${book.name}'s story`}>
+    <motion.div className="story" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} role="dialog" aria-modal="true" aria-label={`${nameOf(book)}'s story`}>
       <div className="story-bars" aria-hidden>
         {bars.map((id, i) => (
           <span key={id}>
@@ -176,8 +177,9 @@ export function StoryPlayer({ book, moments, onClose }: { book: PublicBook; mome
           {slide.type === "intro" ? (
             <motion.div key="intro" initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}>
               <div className="display story-title" style={{ fontSize: "clamp(56px, 13vw, 150px)", color: "white" }}>
-                {book.name}
+                {nameOf(book)}
               </div>
+              {birthSentence(book) && <p className="story-note" style={{ fontSize: 19 }}>{birthSentence(book)}</p>}
               <div className="story-date" style={{ fontSize: 20 }}>
                 {moments.length} moments, in the order they happened
               </div>
@@ -227,7 +229,7 @@ export function StoryPlayer({ book, moments, onClose }: { book: PublicBook; mome
                 To be continued
               </motion.h2>
               <p style={{ marginTop: 16, fontSize: 20, opacity: 0.85 }}>
-                {now.unborn ? `${book.name} is almost here.` : `${book.name} is ${now.headline} and counting.`}
+                {now.unborn ? `${nameOf(book)} is almost here.` : `${nameOf(book)} is ${now.headline} and counting.`}
               </p>
               <div style={{ display: "flex", gap: 12, justifyContent: "center", marginTop: 28, flexWrap: "wrap" }}>
                 <button className="btn btn-primary" onClick={restart}>

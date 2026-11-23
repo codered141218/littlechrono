@@ -10,15 +10,29 @@ A baby timeline for parents. Add moments and photos as they happen, and LittleCh
 - **Friends add photos with a link.** Anyone with the share link can add photos with their name. Parents can edit or delete them, and can turn sharing off.
 - **Smart uploads.** Photos are resized in the browser, uploaded the moment they're picked, and the date is read from the photo's EXIF data automatically.
 - **Personal.** Five color themes, cover photo, "big moment" stickers, filters by kind of moment, and new photos from friends show up live without a refresh.
+- **Birth details.** Nickname, girl or boy, time of birth, weight (kg or lb/oz), length, doctor and place of birth, shown on a hospital-bracelet strip and used to write the first moment.
+- **Accounts.** Parents sign in with Google, see all their timelines on one dashboard, and can invite a co-parent. Friends never need an account.
 
-There are no accounts. Creating a timeline gives you two links:
+Each timeline has two links:
 
 | Link | Who it's for | What it can do |
 | --- | --- | --- |
 | Share link `/b/<id>` | Friends & family | View, play the story, add photos (if allowed) |
-| Parent link `/b/<id>?key=…` | Parents only | Everything: add, edit, delete, settings |
+| Co-parent link `/b/<id>?key=…` | Your partner only | Everything. Signed-in users who open it get the timeline added to their account |
 
-Opening the parent link once on a device remembers parent access there.
+Signed-in parents edit their own timelines from any device without a link. Timelines made on a device before signing in are added to the account automatically.
+
+## Google sign-in
+
+Sign-in turns on when these environment variables are set on the Vercel project (until then the app works without accounts):
+
+| Variable | Value |
+| --- | --- |
+| `AUTH_SECRET` | Any long random string (`openssl rand -base64 33`) |
+| `AUTH_GOOGLE_ID` | OAuth client ID from Google Cloud |
+| `AUTH_GOOGLE_SECRET` | OAuth client secret from Google Cloud |
+
+To get the Google values: in [Google Cloud Console](https://console.cloud.google.com/apis/credentials), create an **OAuth client ID** of type **Web application**, add `https://<your-domain>/api/auth/callback/google` as an authorized redirect URI, then redeploy after adding the variables.
 
 ## Deploy to Vercel
 

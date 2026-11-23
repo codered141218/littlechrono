@@ -74,8 +74,28 @@ export async function api<T>(
 export const mediaUrl = (p: Photo | string) =>
   `/api/media/${typeof p === "string" ? p : p.path}`;
 
-export const shareUrl = (id: string) => `${location.origin}/b/${id}`;
-export const parentUrl = (id: string, key: string) => `${location.origin}/b/${id}?key=${key}`;
+const siteOrigin = () => process.env.NEXT_PUBLIC_SITE_URL || location.origin;
+export const shareUrl = (id: string) => `${siteOrigin()}/b/${id}`;
+export const parentUrl = (id: string, key: string) => `${siteOrigin()}/b/${id}?key=${key}`;
+
+/* ---------- account ---------- */
+
+export async function fetchMe(full = false): Promise<import("./types").Me> {
+  try {
+    return await api<import("./types").Me>(full ? "/api/me" : "/api/me?lite=1");
+  } catch {
+    return { authEnabled: false, user: null, books: [] };
+  }
+}
+
+/** Links timelines this device holds parent links for to the signed-in account. */
+export async function claimSavedBooks(ownedIds: string[]) {
+  const pending = savedBooks().filter((b) => b.key && !ownedIds.includes(b.id));
+  await Promise.all(
+    pending.map((b) => api(`/api/books/${b.id}/claim`, { method: "POST", key: b.key }).catch(() => null)),
+  );
+  return pending.length;
+}
 
 /* ---------- photos ---------- */
 

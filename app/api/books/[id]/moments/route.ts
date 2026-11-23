@@ -1,5 +1,5 @@
 import { body, fail, json, route } from "@/lib/api";
-import { keyFrom, keyMatches } from "@/lib/auth";
+import { canEdit, keyFrom } from "@/lib/auth";
 import { cleanPhotos, cleanText, getBook, isDate, saveMoment } from "@/lib/books";
 import { newMomentId } from "@/lib/ids";
 import { isKind } from "@/lib/kinds";
@@ -9,7 +9,7 @@ export const POST = route(async (req: Request, { params }: { params: Promise<{ i
   const { id } = await params;
   const book = await getBook(id);
   if (!book) return fail("This timeline doesn't exist.", 404);
-  const parent = keyMatches(book, keyFrom(req));
+  const parent = await canEdit(book, keyFrom(req));
   const b = await body(req);
 
   const photos = cleanPhotos(id, b.photos);
