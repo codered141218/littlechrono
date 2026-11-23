@@ -129,6 +129,10 @@ export function Landing({ me }: { me: Me | null }) {
           ))}
         </section>
       </main>
+      <footer className="site-foot">
+        <Link href="/privacy">Privacy policy</Link>
+        <Link href="/terms">Terms of use</Link>
+      </footer>
     </MotionConfig>
   );
 }
