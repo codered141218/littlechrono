@@ -11,8 +11,9 @@ export async function GET(_req: Request, { params }: { params: Promise<{ path: s
   return new Response(media.body, {
     headers: {
       "content-type": media.contentType,
-      // Photo paths are random and never rewritten, so they can be cached forever.
-      "cache-control": "public, max-age=31536000, immutable",
+      // Photo paths are random and never rewritten, so browsers can keep them forever.
+      // "private" keeps copies off the shared CDN, so a deleted photo stops loading right away.
+      "cache-control": "private, max-age=31536000, immutable",
     },
   });
 }
